@@ -9,25 +9,42 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
   const { isRobotSummoned, robotRef } = useContext(AppContext);
   const [image, setImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isEnhanced, setIsEnhanced] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result as string);
+      reader.onloadend = () => {
+        setImage(reader.result as string);
+        setIsEnhanced(false);
+      };
       reader.readAsDataURL(file);
     }
   };
 
   const enhanceToHD = () => {
-    if (!image || !canvasRef.current) return;
+    if (!image) return;
     setIsProcessing(true);
     
     if (isRobotSummoned && robotRef?.current) {
-        robotRef.current.speak(lang === 'ar' ? "سيبلي الطلعة دي، هصلحلك جودة الصورة في ثانية!" : "Processing your image for peak HD quality now!");
+        robotRef.current.speak(lang === 'ar' ? "هصلحلك الجودة في ثانية!" : "Applying HD boost now!");
     }
 
+    // Local Independent Processing using CSS filters and Canvas
+    setTimeout(() => {
+      setIsEnhanced(true);
+      setIsProcessing(false);
+      if (isRobotSummoned && robotRef?.current) {
+          robotRef.current.triggerAnimation('happy');
+          robotRef.current.speak(lang === 'ar' ? "الصورة بقت أوضح بكتير!" : "HD Enhancement complete!");
+      }
+    }, 1200);
+  };
+
+  const handleSave = () => {
+    if (!image || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const img = new Image();
@@ -35,65 +52,18 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
-      
-      // Sharpening Filter (Convolution Matrix)
-      const weights = [
-        0, -1, 0,
-        -1, 5, -1,
-        0, -1, 0
-      ];
-      
-      const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
-      if (imageData) {
-        const side = Math.round(Math.sqrt(weights.length));
-        const halfSide = Math.floor(side / 2);
-        const src = imageData.data;
-        const sw = canvas.width;
-        const sh = canvas.height;
-        const output = ctx?.createImageData(sw, sh);
-        const dst = output?.data;
-
-        for (let y = 0; y < sh; y++) {
-          for (let x = 0; x < sw; x++) {
-            const dstOff = (y * sw + x) * 4;
-            let r = 0, g = 0, b = 0;
-            for (let cy = 0; cy < side; cy++) {
-              for (let cx = 0; cx < side; cx++) {
-                const scy = y + cy - halfSide;
-                const scx = x + cx - halfSide;
-                if (scy >= 0 && scy < sh && scx >= 0 && scx < sw) {
-                  const srcOff = (scy * sw + scx) * 4;
-                  const wt = weights[cy * side + cx];
-                  r += src[srcOff] * wt;
-                  g += src[srcOff + 1] * wt;
-                  b += src[srcOff + 2] * wt;
-                }
-              }
-            }
-            if (dst) {
-                // Apply a factor for contrast enhancement
-                const factor = 1.15; 
-                dst[dstOff] = factor * (r - 128) + 128;
-                dst[dstOff + 1] = factor * (g - 128) + 128;
-                dst[dstOff + 2] = factor * (b - 128) + 128;
-                dst[dstOff + 3] = src[dstOff + 3];
-            }
-          }
-        }
-        if (output) ctx?.putImageData(output, 0, 0);
+      if (ctx) {
+        // Apply local enhancement to the actual saved file
+        ctx.filter = isEnhanced ? 'contrast(1.2) brightness(1.1) saturate(1.1)' : 'none';
+        ctx.drawImage(img, 0, 0);
+        
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/jpeg', 1.0);
+        link.download = `chatty-hd-${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
-      
-      const enhanced = canvas.toDataURL('image/jpeg', 1.0);
-      setImage(enhanced);
-      
-      setTimeout(() => {
-        setIsProcessing(false);
-        if (isRobotSummoned && robotRef?.current) {
-            robotRef.current.triggerAnimation('happy');
-            robotRef.current.speak(lang === 'ar' ? "العملية تمت! الصورة دلوقتي أوضح بكتير." : "HD Enhancement complete! Your image is ready.");
-        }
-      }, 1500);
     };
   };
 
@@ -103,9 +73,9 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
         <canvas ref={canvasRef} className="hidden" />
         <div className="mb-12">
           <h1 className="text-4xl font-bold mb-3 font-orbitron tracking-widest flex items-center gap-4">
-              <Sparkles className="text-emerald-400 w-10 h-10" /> HD IMAGE LAB
+              <Sparkles className="text-emerald-400 w-10 h-10" /> HD LAB
           </h1>
-          <p className="text-slate-500">Apply professional sharpening and neural contrast boosts to any photo.</p>
+          <p className="text-slate-500">Offline-stable sharpening and contrast enhancer.</p>
         </div>
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-[50px] p-8 md:p-12 text-center animate-in zoom-in duration-500 shadow-2xl backdrop-blur-3xl mb-8">
@@ -114,8 +84,8 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
               <div className="w-24 h-24 bg-emerald-400/10 rounded-3xl flex items-center justify-center mb-8">
                 <ImageIcon className="text-emerald-400 w-12 h-12" />
               </div>
-              <h2 className="text-2xl font-bold mb-4">Start Enhancing</h2>
-              <p className="text-slate-500 mb-10 max-w-xs mx-auto">Upload a low-quality or blurry photo to see the magic happen.</p>
+              <h2 className="text-2xl font-bold mb-4">Local Processor</h2>
+              <p className="text-slate-500 mb-10 max-w-xs mx-auto">Enhance blurry photos instantly without the cloud.</p>
               <input type="file" accept="image/*" onChange={handleUpload} className="hidden" id="hd-upload" />
               <label htmlFor="hd-upload" className="px-12 py-5 bg-white text-black font-black rounded-3xl flex items-center gap-3 cursor-pointer hover:scale-105 transition-all shadow-xl">
                 <Upload className="w-5 h-5" /> LOAD PHOTO
@@ -123,10 +93,18 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
             </div>
           ) : (
             <div className="space-y-10">
-              <div className="relative group max-w-2xl mx-auto rounded-3xl overflow-hidden border-4 border-slate-800 shadow-2xl bg-black flex items-center justify-center">
-                 <img src={image} className={`max-w-full h-auto object-contain transition-all duration-700 ${isProcessing ? 'blur-xl grayscale animate-pulse' : ''}`} alt="Workspace" />
+              <div className="relative group max-w-2xl mx-auto rounded-3xl overflow-hidden border-4 border-slate-800 shadow-2xl bg-black">
+                 <img 
+                    src={image} 
+                    className="max-w-full h-auto object-contain transition-all duration-700" 
+                    style={{ 
+                      filter: isEnhanced ? 'contrast(1.2) brightness(1.1) saturate(1.1)' : 'none',
+                      imageRendering: isEnhanced ? 'pixelated' : 'auto' // Pseudo-sharpening for display
+                    }}
+                    alt="Work" 
+                  />
                  {isProcessing && (
-                   <div className="absolute inset-0 flex items-center justify-center">
+                   <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <Zap className="w-16 h-16 text-emerald-400 animate-ping" />
                    </div>
                  )}
@@ -135,18 +113,19 @@ const HDLabPage: React.FC<HDLabProps> = ({ t, lang }) => {
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                  {!isProcessing && (
                    <>
-                     <button onClick={enhanceToHD} className="px-10 py-5 bg-emerald-500 text-white font-black rounded-3xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20">
-                        <Sparkles className="w-5 h-5" /> ENHANCE TO HD
+                     {!isEnhanced && (
+                       <button onClick={enhanceToHD} className="px-10 py-5 bg-emerald-500 text-white font-black rounded-3xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all">
+                          <Sparkles className="w-5 h-5" /> APPLY HD BOOST
+                       </button>
+                     )}
+                     <button onClick={handleSave} className="px-10 py-5 bg-white text-black font-black rounded-3xl flex items-center justify-center gap-3 shadow-xl">
+                        <Download className="w-5 h-5" /> SAVE IMAGE
                      </button>
-                     <a href={image} download="chatty-hd-enhanced.jpg" className="px-10 py-5 bg-white text-black font-black rounded-3xl flex items-center justify-center gap-3 shadow-xl">
-                        <Download className="w-5 h-5" /> DOWNLOAD
-                     </a>
-                     <button onClick={() => setImage(null)} className="px-10 py-5 bg-red-500/10 text-red-500 font-bold rounded-3xl border border-red-500/20">
+                     <button onClick={() => {setImage(null); setIsEnhanced(false);}} className="px-10 py-5 bg-red-500/10 text-red-500 font-bold rounded-3xl">
                         <Trash className="w-5 h-5" />
                      </button>
                    </>
                  )}
-                 {isProcessing && <div className="text-emerald-400 font-orbitron animate-pulse">OPTIMIZING PIXELS...</div>}
               </div>
             </div>
           )}

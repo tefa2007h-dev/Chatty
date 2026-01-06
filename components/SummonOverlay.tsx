@@ -41,7 +41,7 @@ const RobotCharacter = ({ isSpeaking, isListening, status, volume, isSpinning, i
   
   useEffect(() => {
     if (status.includes('THINKING')) setExpression('thinking');
-    else if (status.includes('HELP') || status.includes('CARE')) setExpression('caring');
+    else if (status.includes('HELP') || status.includes('CARE') || status.includes('RESTING')) setExpression('caring');
     else if (isHappy || status.includes('TALKING') || status.includes('RESPONDING')) setExpression('happy');
     else if (status === 'SURPRISED') setExpression('surprised');
     else setExpression('default');
@@ -71,7 +71,6 @@ const RobotCharacter = ({ isSpeaking, isListening, status, volume, isSpinning, i
   const getMouthPath = () => {
     if (expression === 'surprised') return "M145 200 A 15 15 0 1 0 175 200 A 15 15 0 1 0 145 200";
     if (isSpeaking) {
-      // Dynamic mouth opening based on volume
       const v = Math.min(volume * 65, 30);
       const w = 22 + volume * 18;
       return `M${160-w} ${200-v/3} Q160 ${205+v*1.1} ${160+w} ${200-v/3} Q160 ${215+v*1.6} ${160-w} ${200-v/3}`;
@@ -222,8 +221,11 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
         callbacks: {
           onopen: () => {
             setIsListening(true);
-            setStatus('LISTENING...');
-            setIsSpinning(true); setTimeout(() => setIsSpinning(false), 800);
+            setStatus('CONNECTION IS ACTIVE');
+            setIsSpinning(true); setTimeout(() => {
+                setIsSpinning(false);
+                setStatus('LISTENING...');
+            }, 1000);
 
             const source = audioCtxIn.current!.createMediaStreamSource(stream);
             const scriptNode = audioCtxIn.current!.createScriptProcessor(4096, 1, 1);
@@ -232,13 +234,7 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
             scriptNode.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const int16 = new Int16Array(inputData.length);
-              let sum = 0;
-              for (let i = 0; i < inputData.length; i++) {
-                int16[i] = inputData[i] * 32768;
-                sum += Math.abs(inputData[i]);
-              }
-              const avg = sum / inputData.length;
-              if (avg > 0.05 && isSpeaking) stopPlayback();
+              for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
               sessionPromise.then(s => s.sendRealtimeInput({ media: { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' } }));
             };
             source.connect(scriptNode);
@@ -267,18 +263,25 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
               sourcesRef.current.add(src);
             }
           },
+          onerror: (err: any) => {
+            console.error("Live session error:", err);
+            // Handling Quota or general failure
+            if (err?.message?.includes('429') || err?.status === 429) {
+                setStatus("I'm resting my brain for a moment, but I can still help you with tools!");
+            } else {
+                setStatus('CONNECTION STALL...');
+            }
+          },
           onclose: () => {
             setIsListening(false);
-            setStatus('OFFLINE');
           }
         },
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: { 
-            // Kore used for a high-quality female profile
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } 
           },
-          systemInstruction: "You are Chatty. A highly expressive, witty, and charming female robot assistant with a Pixar-style face. You speak flawless Egyptian Arabic and English. Your personality is helpful, slightly playful, and warm. Respond in the language of the user. If they speak Egyptian Arabic, use Egyptian Arabic. If they speak English, use natural English. Stop talking immediately if interrupted.",
+          systemInstruction: "You are Chatty. Playful AI. Connection is active. Confirm to user if asked.",
         }
       });
       sessionRef.current = await sessionPromise;
@@ -289,14 +292,16 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
         if (target) {
           const data = new Uint8Array(target.frequencyBinCount);
           target.getByteFrequencyData(data);
-          // Normalized volume for animation
           vol = data.reduce((a, b) => a + b) / data.length / (isSpeaking ? 80 : 150);
         }
         setCurrentVolume(Math.min(vol, 1));
         animFrameRef.current = requestAnimationFrame(animateStatus);
       };
       animFrameRef.current = requestAnimationFrame(animateStatus);
-    } catch (err) { setIsListening(false); setStatus('ERROR'); }
+    } catch (err: any) { 
+        setIsListening(false); 
+        setStatus("I'm resting my brain for a moment, but I can still help you with tools!");
+    }
   };
 
   const stopPlayback = () => {
@@ -312,7 +317,7 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
     if (audioCtxIn.current && audioCtxIn.current.state !== 'closed') audioCtxIn.current.close().catch(() => {});
     if (audioCtxOut.current && audioCtxOut.current.state !== 'closed') audioCtxOut.current.close().catch(() => {});
     audioCtxIn.current = null; audioCtxOut.current = null;
-    setIsSpeaking(false); setIsListening(false); setStatus('OFFLINE');
+    setIsSpeaking(false); setIsListening(false);
   };
 
   if (!active) return null;
@@ -324,7 +329,6 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
       
       <div className="absolute top-16 text-center animate-in fade-in slide-in-from-top-4 duration-1000">
         <h2 className="font-orbitron text-white text-6xl font-black tracking-[0.8em] mb-2 drop-shadow-[0_0_25px_rgba(203,213,225,0.1)]">CHATTY</h2>
-        <div className="h-1 w-48 bg-gradient-to-r from-transparent via-slate-500/30 to-transparent mx-auto opacity-40" />
       </div>
 
       <RobotCharacter 
@@ -337,8 +341,8 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
         onClick={() => setIsHappy(true)}
       />
       
-      <div className="mt-16 text-center relative">
-        <div className={`text-[16px] uppercase tracking-[0.6em] font-orbitron font-bold transition-all duration-300 ${status.includes('LISTENING') ? 'text-cyan-400 animate-pulse' : status.includes('TALKING') || status.includes('RESPONDING') ? 'text-slate-300' : 'text-slate-500'}`}>
+      <div className="mt-16 text-center relative px-8 max-w-lg">
+        <div className={`text-[16px] uppercase tracking-[0.3em] font-orbitron font-bold transition-all duration-300 ${status.includes('LISTENING') ? 'text-cyan-400 animate-pulse' : 'text-slate-500'}`}>
           {status}
         </div>
       </div>
@@ -353,7 +357,6 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
               style={{ 
                 height: isListening || isSpeaking ? `${8 + intensity * 140}px` : '6px', 
                 opacity: isListening || isSpeaking ? 0.2 + intensity * 0.8 : 0.05, 
-                boxShadow: intensity > 0.5 ? '0 0 25px #94a3b8' : 'none' 
               }} 
             />
           );
