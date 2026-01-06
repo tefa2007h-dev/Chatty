@@ -1,0 +1,8 @@
+{
+  "name": "Chatty AI",
+  "description": "A professional AI assistant with multimodal support, voice interaction, and high-end animations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

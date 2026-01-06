@@ -1,0 +1,133 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chatty AI | Cyber Core</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --chat-bg: #121212;
+        --sidebar-bg: #171717;
+        --text-main: #f8fafc;
+        --neon-cyan: #00f3ff;
+      }
+      body {
+        font-family: 'Inter', 'Noto Sans Arabic', sans-serif;
+        margin: 0;
+        background-color: #121212;
+        color: #f8fafc;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden; /* App handles its own scrolling */
+      }
+      #root {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      .font-orbitron { font-family: 'Orbitron', sans-serif; }
+      .rtl { direction: rtl; }
+      .ltr { direction: ltr; }
+      
+      @keyframes teleport-in {
+        0% { transform: scale(0.3) translateY(100px); filter: blur(30px) brightness(3); opacity: 0; }
+        60% { transform: scale(1.1) translateY(-15px); filter: blur(5px) brightness(1.5); opacity: 0.9; }
+        100% { transform: scale(1) translateY(0); filter: blur(0) brightness(1); opacity: 1; }
+      }
+      .animate-teleport { animation: teleport-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+      @keyframes robot-hover {
+        0%, 100% { transform: translateY(0) rotateX(1deg); }
+        50% { transform: translateY(-10px) rotateX(-1deg); }
+      }
+      .hovering-robot { animation: robot-hover 4s ease-in-out infinite; }
+
+      @keyframes eye-blink {
+        0%, 90%, 100% { transform: scaleY(1); }
+        95% { transform: scaleY(0.1); }
+      }
+      .blink-eye { animation: eye-blink 5s infinite; transform-origin: center; }
+
+      @keyframes ambient-glow {
+        0% { transform: scale(1); opacity: 0.05; }
+        50% { transform: scale(1.2); opacity: 0.1; }
+        100% { transform: scale(1); opacity: 0.05; }
+      }
+      .bg-ambient { animation: ambient-glow 10s infinite ease-in-out; }
+
+      /* Cooking Alchemy Animations */
+      @keyframes vortex {
+        0% { transform: rotate(0deg) scale(0.5); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: rotate(1440deg) scale(0.2); opacity: 0.2; }
+      }
+      .animate-vortex { 
+        animation: vortex 2.5s cubic-bezier(0.5, 0, 0.5, 1) forwards; 
+      }
+
+      @keyframes shake {
+        0%, 100% { transform: translate(0, 0); }
+        10%, 30%, 50%, 70%, 90% { transform: translate(-4px, 0); }
+        20%, 40%, 60%, 80% { transform: translate(4px, 0); }
+      }
+      .animate-shake { animation: shake 0.5s ease-in-out; }
+
+      .particle {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 200;
+        animation: particle-explosion 1.5s cubic-bezier(0.1, 1, 0.1, 1) forwards;
+      }
+
+      @keyframes particle-explosion {
+        0% { transform: translate(0, 0) scale(1); opacity: 1; }
+        100% { transform: translate(var(--x), var(--y)) scale(0); opacity: 0; }
+      }
+
+      @keyframes premium-reveal {
+        0% { transform: translateY(40px) scale(0.95); opacity: 0; filter: blur(10px); }
+        100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+      }
+      .premium-card-reveal { animation: premium-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react,react-dom",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+  </body>
+</html>
