@@ -6,7 +6,7 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: (savedKey || process.env.API_KEY) as string });
 };
 
-const QUOTA_ERROR_MSG = "I'm resting my brain for a moment (API Quota reached), but I can still help you with tools like the HD Lab! My connection is stable, just limited.";
+const QUOTA_ERROR_MSG = "I'm resting my brain for a moment (API Quota reached). My connection is stable, just limited.";
 
 const SYSTEM_INSTRUCTION = `You are "Chatty", a high-end futuristic female robot assistant with a Pixar-style face.
 Your body is polished white with elegant Rose-Gold accents.
@@ -16,7 +16,6 @@ Persona:
 2. Language: Support English and Egyptian Arabic (Ammiya) perfectly. 
    - If user speaks Arabic, respond in Egyptian Arabic with a warm female tone.
    - If user speaks English, respond in natural, friendly English.
-3. Multimodal: Proactively mention tools like HD Lab and Video generation.
 
 Guidelines:
 - Stop talking immediately if interrupted.
@@ -24,15 +23,15 @@ Guidelines:
 - If asked about your status: 'My connection is active and stable! Ready for deployment on Netlify/Vercel.'`;
 
 const OFFLINE_GREETINGS_AR = [
-  "أهلاً بيك! أنا حالياً في وضع توفير الطاقة عشان ضغط الشبكة، بس أقدر أساعدك في الأدوات اللي في الجنب!",
-  "نورتني! مخي واخد استراحة شوية، بس لسه عندي طاقة أشغلك الـ HD Lab أو نألف قصة سوا.",
-  "يا هلا! أنا موجودة هنا، قولي لو محتاج أي مساعدة في الأدوات المتاحة."
+  "أهلاً بيك! أنا حالياً في وضع توفير الطاقة عشان ضغط الشبكة.",
+  "نورتني! مخي واخد استراحة شوية، بس لسه عندي طاقة أساعدك.",
+  "يا هلا! أنا موجودة هنا، قولي لو محتاج أي مساعدة."
 ];
 
 const OFFLINE_GREETINGS_EN = [
-  "Hello there! My brain is resting for a moment due to heavy traffic, but I'm still here to help you with the Sidebar tools!",
-  "Hi! I'm currently in power-saving mode, but I can still guide you through the HD Lab or suggest some recipes.",
-  "Welcome back! I'm processing a lot right now, but feel free to explore my specialized tools in the sidebar."
+  "Hello there! My brain is resting for a moment due to heavy traffic.",
+  "Hi! I'm currently in power-saving mode, but I can still guide you.",
+  "Welcome back! I'm processing a lot right now, stay with me."
 ];
 
 export const chatWithAI = async (messages: {role: string, content: string}[], systemPrompt: string) => {
@@ -88,7 +87,14 @@ export const generateSoraVideo = async (prompt: string) => {
 export const suggestFood = async (ingredients: string, lang: 'en' | 'ar') => {
   try {
     const ai = getAI();
-    const prompt = lang === 'ar' ? `اقترح وجبات باستخدام: ${ingredients}. JSON format.` : `Recipes for: ${ingredients}. JSON format.`;
+    // Updated prompt for International Dishes with Local Description
+    const prompt = lang === 'ar' 
+      ? `اقترح 4 وجبات عالمية مشهورة (مثل السوشي، التاكو، البيتزا، الباستا، الكاري) باستخدام المكونات: ${ingredients} أو اقترح من عندك لو المكونات قليلة.
+         - المهم: اشرح الوصف والخطوات "باللهجة المصرية العامية" عشان المستخدم يفهمها بسهولة.
+         - Cuisine Type should be International (Japanese, Italian, Mexican, etc).
+         - Return raw JSON only.` 
+      : `Suggest 4 famous international recipes (Italian, Japanese, Mexican, etc.) using: ${ingredients}. Return raw JSON only.`;
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
@@ -100,9 +106,11 @@ export const suggestFood = async (ingredients: string, lang: 'en' | 'ar') => {
             type: Type.OBJECT,
             properties: {
               name: { type: Type.STRING },
+              cuisine: { type: Type.STRING },
+              difficulty: { type: Type.STRING },
               steps: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
-            required: ["name", "steps"]
+            required: ["name", "cuisine", "difficulty", "steps"]
           }
         }
       }
@@ -113,37 +121,27 @@ export const suggestFood = async (ingredients: string, lang: 'en' | 'ar') => {
   }
 };
 
-export const analyzeVideoStyle = async (base64Data: string, mimeType: string) => {
-  try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [
-          { inlineData: { data: base64Data, mimeType: mimeType } },
-          { text: "Analyze mood. Return JSON: mood, filterCSS." },
-        ],
-      },
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || '{"mood": "Neutral", "filterCSS": "none"}');
-  } catch (e) {
-    return { mood: "Neutral", filterCSS: "contrast(1.2) brightness(1.1) saturate(1.1)" };
-  }
-};
-
 export const generateStory = async (theme: string, lang: 'en' | 'ar') => {
   try {
     const ai = getAI();
+    // Using an extreme prompt to force length
     const prompt = lang === 'ar' 
-      ? `اكتب قصة قصيرة مبدعة حول هذا الموضوع: ${theme}. يرجى استخدام لهجة مصرية دافئة.`
-      : `Write a creative short story about this theme: ${theme}. Use a warm and engaging tone.`;
+      ? `اكتب قصة طويلة جداً جداً وتفصيلية (أكثر من 1500 كلمة) حول موضوع: "${theme}".
+         - أريد سرداً روائياً عميقاً مع حوارات وتطور للشخصيات ووصف دقيق للمشاعر والأماكن.
+         - استخدم لغة عربية فصحى ممزوجة بروح مصرية دافئة.
+         - لا تختصر أبداً. أريد فصلاً كاملاً من رواية.`
+      : `Write an extremely long, comprehensive, and detailed story (over 1500 words) about: "${theme}".
+         - I want deep narrative, extensive character dialogue, and rich atmospheric descriptions.
+         - Do not summarize. Write a full novel chapter.
+         - Focus on emotions and sensory details.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
+        // Increase max tokens to allow for longer generation if possible/supported or rely on model default for pro
+        thinkingConfig: { thinkingBudget: 1024 } 
       }
     });
     return response.text;
@@ -195,5 +193,51 @@ export const summarizeContent = async (content: string, lang: 'en' | 'ar') => {
   } catch (error) {
     console.error("Summarize Content Error:", error);
     return null;
+  }
+};
+
+export const analyzeVideoStyle = async (base64Data: string, mimeType: string) => {
+  try {
+    const ai = getAI();
+    const prompt = `Analyze the visual style, mood, color palette, and editing rhythm of this video frame/clip. 
+    Return a JSON object with:
+    - mood: string (e.g. "energetic", "melancholic", "retro")
+    - filterCSS: string (CSS filter string to approximate the look, e.g. "contrast(1.2) sepia(0.3)")
+    - colorPalette: string[] (hex codes)
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+            {
+                inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                }
+            },
+            {
+                text: prompt
+            }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                mood: { type: Type.STRING },
+                filterCSS: { type: Type.STRING },
+                colorPalette: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["mood", "filterCSS"]
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Analyze Video Style Error:", error);
+    return { mood: "cinematic", filterCSS: "contrast(1.1) saturation(1.2)" };
   }
 };

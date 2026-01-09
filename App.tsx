@@ -9,16 +9,14 @@ import Sidebar from './components/Sidebar';
 import HomeChat from './pages/HomeChat';
 import StoriesPage from './pages/Stories';
 import FoodPage from './pages/FoodSuggestions';
-import TemplatesPage from './pages/Templates';
 import ImageGeneratorPage from './pages/ImageGenerator';
 import SummariesPage from './pages/Summaries';
 import SettingsPage from './pages/Settings';
 import ProfilePage from './pages/Profile';
 import SubscribePage from './pages/Subscribe';
-import HDLabPage from './pages/HDLab';
 import SummonOverlay from './components/SummonOverlay';
 
-type Page = 'splash' | 'login' | 'chat' | 'stories' | 'food' | 'templates' | 'images' | 'summaries' | 'settings' | 'profile' | 'subscribe' | 'hdlab';
+type Page = 'splash' | 'login' | 'chat' | 'stories' | 'food' | 'images' | 'summaries' | 'settings' | 'profile' | 'subscribe';
 
 export const AppContext = createContext<{
   isRobotSummoned: boolean;
@@ -92,10 +90,8 @@ const App: React.FC = () => {
       case 'chat': return <HomeChat t={t} lang={lang} />;
       case 'stories': return <StoriesPage t={t} lang={lang} />;
       case 'food': return <FoodPage t={t} lang={lang} />;
-      case 'templates': return <TemplatesPage t={t} lang={lang} />;
       case 'images': return <ImageGeneratorPage t={t} lang={lang} />;
       case 'summaries': return <SummariesPage t={t} lang={lang} />;
-      case 'hdlab': return <HDLabPage t={t} lang={lang} />;
       case 'settings': return <SettingsPage toggleLang={(l) => { setLang(l); localStorage.setItem('chatty_lang', l); }} currentLang={lang} t={t} />;
       case 'profile': return <ProfilePage user={user!} onLogout={handleLogout} t={t} lang={lang} />;
       case 'subscribe': return <SubscribePage t={t} lang={lang} onUpgrade={() => {

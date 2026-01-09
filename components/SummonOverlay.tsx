@@ -13,12 +13,6 @@ function decode(base64: string) {
   return bytes;
 }
 
-function encode(bytes: Uint8Array) {
-  let b = '';
-  for (let i = 0; i < bytes.byteLength; i++) b += String.fromCharCode(bytes[i]);
-  return btoa(b);
-}
-
 async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
@@ -29,6 +23,23 @@ async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: 
   }
   return buffer;
 }
+
+const cleanTextForSpeech = (text: string) => {
+  return text
+    // Remove Markdown headers, bold, italic
+    .replace(/[*#_`~>]/g, '') 
+    // Remove links [text](url) keeping only text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') 
+    // Remove raw URLs
+    .replace(/https?:\/\/\S+/g, '') 
+    // Remove generic brackets
+    .replace(/[\[\]\(\)\{\}]/g, '')
+    // Remove hyphens used for lists
+    .replace(/^\s*-\s+/gm, '') 
+    // Collapse multiple spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
 const RobotCharacter = ({ isSpeaking, status, volume, isSpinning, isHappy, onClick }: { isSpeaking: boolean, status: string, volume: number, isSpinning?: boolean, isHappy?: boolean, onClick: () => void }) => {
   const [eyeFocus, setEyeFocus] = useState({ x: 0, y: 0 });
@@ -71,7 +82,7 @@ const RobotCharacter = ({ isSpeaking, status, volume, isSpinning, isHappy, onCli
           </linearGradient>
         </defs>
 
-        {/* Arms (Female Persona Style) */}
+        {/* Arms */}
         <path d="M100 240 Q60 260 70 340" stroke="url(#roseGold)" strokeWidth="14" fill="none" strokeLinecap="round" />
         <path d="M220 240 Q260 260 250 340" stroke="url(#roseGold)" strokeWidth="14" fill="none" strokeLinecap="round" />
 
@@ -87,7 +98,7 @@ const RobotCharacter = ({ isSpeaking, status, volume, isSpinning, isHappy, onCli
         <circle cx="110" cy="185" r="8" fill="#E5B1A1" fillOpacity="0.2" />
         <circle cx="210" cy="185" r="8" fill="#E5B1A1" fillOpacity="0.2" />
 
-        {/* Eyes (Female Style) */}
+        {/* Eyes */}
         <g className="transition-all duration-300">
            <ellipse cx="125" cy="160" rx="16" ry="18" fill="white" className="blink-eye" />
            <circle cx={125 + eyeFocus.x} cy={160 + eyeFocus.y} r="6" fill="#121212" />
@@ -95,7 +106,7 @@ const RobotCharacter = ({ isSpeaking, status, volume, isSpinning, isHappy, onCli
            <circle cx={195 + eyeFocus.x} cy={160 + eyeFocus.y} r="6" fill="#121212" />
         </g>
 
-        {/* Mouth Lip-sync */}
+        {/* Mouth */}
         <path d={mouthPath()} stroke="url(#roseGold)" strokeWidth="4" strokeLinecap="round" className="transition-all duration-75" />
       </svg>
       <div className="w-80 h-10 bg-slate-400/10 blur-3xl rounded-full mt-4" style={{ transform: `scaleX(${1 + volume})` }} />
@@ -109,7 +120,6 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
   const [isSpinning, setIsSpinning] = useState(false);
   const [isHappy, setIsHappy] = useState(false);
 
-  // Store session promise to handle race conditions during sendRealtimeInput
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const outCtx = useRef<AudioContext | null>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -124,23 +134,33 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
         setTimeout(()=>setIsHappy(false), 2000); 
       } 
     },
-    speak: (text: string) => {
-      // Local Speech API Fallback
+    speak: (text: string, overrideLang?: 'en' | 'ar') => {
+      // 1. Clean the text (remove markdown symbols)
+      const cleanText = cleanTextForSpeech(text);
+      const targetLang = overrideLang || lang;
+
+      // 2. Cancel any active speech
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
-        synthRef.current = new SpeechSynthesisUtterance(text);
-        synthRef.current.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-        synthRef.current.pitch = 1.2;
-        synthRef.current.rate = 1.0;
-        synthRef.current.onstart = () => setIsSpeaking(true);
-        synthRef.current.onend = () => setIsSpeaking(false);
-        window.speechSynthesis.speak(synthRef.current);
-      }
-      // Rely on the session promise to send data safely
-      if (sessionPromiseRef.current) {
-        sessionPromiseRef.current.then((session) => {
-          session.sendRealtimeInput({ text });
-        });
+        
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = targetLang === 'ar' ? 'ar-EG' : 'en-US';
+        utterance.pitch = 1.1; 
+        utterance.rate = 1.0;
+
+        // 3. Try to find a good female voice
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(v => 
+          v.lang.includes(targetLang === 'ar' ? 'ar' : 'en') && 
+          (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Female'))
+        );
+        if (preferredVoice) utterance.voice = preferredVoice;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        
+        window.speechSynthesis.speak(utterance);
       }
     }
   }));
@@ -157,7 +177,6 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
       const ai = new GoogleGenAI({ apiKey: apiKey as string });
       outCtx.current = new AudioContext({ sampleRate: 24000 });
       
-      // Update: Use the latest stable real-time audio model
       sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
@@ -165,6 +184,7 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
           onmessage: async (msg: LiveServerMessage) => {
             const audio = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (audio && outCtx.current) {
+              window.speechSynthesis.cancel(); // Prioritize Live Audio
               setIsSpeaking(true);
               const buffer = await decodeAudioData(decode(audio), outCtx.current, 24000, 1);
               const src = outCtx.current.createBufferSource();
@@ -182,7 +202,7 @@ export const SummonOverlay = forwardRef<any, SummonOverlayProps>(({ active, onCl
           onclose: () => setStatus('OFFLINE')
         },
         config: { 
-          responseModalalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
         }
       });
